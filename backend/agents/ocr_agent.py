@@ -10,6 +10,7 @@ from mistralai.async_client import MistralAsyncClient
 from mistralai.models.chat_completion import ChatMessage
 import base64
 import io
+from database.db import db
 
 class OCRAgent(BaseAgent):
     def __init__(self):
@@ -40,6 +41,15 @@ class OCRAgent(BaseAgent):
         try:
             # Handle different input types
             if isinstance(input_data, str):
+                # Check if it's a numeric document_id
+                if input_data.isdigit() and db.pool:
+                    # Try to resolve document_id to file_path
+                    file_path = await self._get_file_path_from_document_id(int(input_data))
+                    if file_path:
+                        return await self._process_file(
+                            file_path, max_pages, language, dpi, use_mistral, preserve_layout
+                        )
+                
                 # Check if it's a file path
                 file_path = Path(input_data)
                 if file_path.exists():
@@ -62,6 +72,13 @@ class OCRAgent(BaseAgent):
                         Path(input_data['file_path']),
                         max_pages, language, dpi, use_mistral, preserve_layout
                     )
+                elif 'document_id' in input_data and db.pool:
+                    # Resolve document_id to file_path
+                    file_path = await self._get_file_path_from_document_id(input_data['document_id'])
+                    if file_path:
+                        return await self._process_file(
+                            file_path, max_pages, language, dpi, use_mistral, preserve_layout
+                        )
                 elif 'full_text' in input_data:
                     return {
                         "extracted_text": input_data['full_text'],
@@ -81,6 +98,32 @@ class OCRAgent(BaseAgent):
 
         except Exception as e:
             raise Exception(f"OCR processing failed: {str(e)}")
+
+    async def _get_file_path_from_document_id(self, document_id: int) -> Optional[Path]:
+        """Get file path from document_id"""
+        if not db.pool:
+            return None
+        
+        try:
+            # Get document info from database
+            doc = await db.fetchrow("""
+                SELECT filename FROM documents WHERE id = $1
+            """, document_id)
+            
+            if not doc:
+                return None
+            
+            # Find file path using pattern matching
+            file_pattern = f"*_{doc['filename']}"
+            matching_files = list(config.UPLOAD_FOLDER.glob(file_pattern))
+            
+            if matching_files:
+                return Path(matching_files[0])
+            
+            return None
+        except Exception as e:
+            print(f"Error getting file path from document_id {document_id}: {e}")
+            return None
 
     async def _process_file(
         self,

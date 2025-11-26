@@ -135,7 +135,7 @@ const Dashboard = () => {
   const handleFileUpload = async (files) => {
     console.log('Files uploaded:', files);
     setUploadedFiles(files);
-    // TODO: Send files to backend API
+    // Files are already uploaded to backend via FileUpload component
   };
 
   const handleConfigureAgent = useCallback((agentType, agentName) => {
@@ -158,11 +158,46 @@ const Dashboard = () => {
     const node = nodes.find(n => n.data.type === agentType);
     if (!nodeId) return;
 
+    // Check if file is needed for OCR agent
+    if (agentType === 'ocr' && uploadedFiles.length === 0) {
+      alert('Please upload a document first before executing OCR Agent');
+      return;
+    }
+
     updateNodeStatus(nodeId, 'running');
 
     try {
+      // Prepare input based on agent type
+      let inputData;
+      if (agentType === 'ocr' && uploadedFiles.length > 0) {
+        // Use file path from uploaded file
+        const uploadedFile = uploadedFiles[0];
+        if (uploadedFile.file_path) {
+          // Use file_path directly (absolute path from backend)
+          inputData = uploadedFile.file_path;
+        } else if (uploadedFile.document_id) {
+          // If we have document_id, send it as string (OCR Agent will resolve it)
+          inputData = uploadedFile.document_id.toString();
+        } else if (uploadedFile.uploadResult?.file_path) {
+          // Fallback to uploadResult
+          inputData = uploadedFile.uploadResult.file_path;
+        } else {
+          throw new Error('File path not available. Please upload the file again.');
+        }
+      } else if (uploadedFiles.length > 0) {
+        // For other agents, pass the uploaded file info
+        const uploadedFile = uploadedFiles[0];
+        inputData = {
+          document_id: uploadedFile.document_id || uploadedFile.uploadResult?.document_id,
+          file_path: uploadedFile.file_path || uploadedFile.uploadResult?.file_path,
+          ...uploadedFile
+        };
+      } else {
+        inputData = 'Sample document input';
+      }
+
       const response = await executeAgent(agentType, {
-        input: uploadedFiles.length > 0 ? uploadedFiles : 'Sample document input',
+        input: inputData,
         config: node?.data.config || {},
         parameters: node?.data.config || {},
       });
@@ -280,6 +315,18 @@ const Dashboard = () => {
             <div className="workflow-header">
               <h2>Agent Workflow</h2>
               <p>Configure and execute your multi-agent pipeline</p>
+              {uploadedFiles.length > 0 && (
+                <div className="uploaded-files-indicator">
+                  <span className="file-count-badge">{uploadedFiles.length}</span>
+                  <span>Document{uploadedFiles.length > 1 ? 's' : ''} ready</span>
+                  {uploadedFiles[0]?.name && (
+                    <span className="file-name-preview">: {uploadedFiles[0].name}</span>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="workflow-upload-section">
+              <FileUpload onFileUpload={handleFileUpload} />
             </div>
             <div className="flow-container">
               <ReactFlow

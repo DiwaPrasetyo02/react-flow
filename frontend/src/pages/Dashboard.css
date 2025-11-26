@@ -156,6 +156,10 @@
 /* Workflow Page */
 .workflow-header {
   margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .workflow-header h2 {
@@ -168,6 +172,44 @@
 .workflow-header p {
   font-size: 16px;
   color: #64748b;
+}
+
+.uploaded-files-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #d1fae5;
+  border-radius: 20px;
+  font-size: 14px;
+  color: #065f46;
+  font-weight: 600;
+}
+
+.file-count-badge {
+  background: #10b981;
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.file-name-preview {
+  color: #047857;
+  font-weight: 500;
+}
+
+.workflow-upload-section {
+  margin-bottom: 24px;
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .flow-container {

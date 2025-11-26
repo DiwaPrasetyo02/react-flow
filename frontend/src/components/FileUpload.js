@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
+import { uploadFile } from '../services/api';
 import './FileUpload.css';
 
-const FileUpload = ({ onFileUpload, acceptedFormats = '.pdf,.csv,.doc,.docx,.txt' }) => {
+const FileUpload = ({ onFileUpload, acceptedFormats = '.pdf,.csv,.doc,.docx,.txt,.jpg,.jpeg,.png' }) => {
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -41,20 +42,37 @@ const FileUpload = ({ onFileUpload, acceptedFormats = '.pdf,.csv,.doc,.docx,.txt
     try {
       const results = [];
       for (const file of fileArray) {
-        const fileData = {
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          file: file,
-          uploadedAt: new Date().toISOString(),
-        };
-        results.push(fileData);
+        try {
+          // Upload file to backend
+          const uploadResult = await uploadFile(file);
+          
+          const fileData = {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            document_id: uploadResult.document_id,
+            file_path: uploadResult.file_path,
+            uploadedAt: new Date().toISOString(),
+            uploadResult: uploadResult,
+          };
+          results.push(fileData);
+        } catch (error) {
+          console.error(`Error uploading ${file.name}:`, error);
+          // Still add file to list but mark as failed
+          results.push({
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            error: error.message || 'Upload failed',
+            uploadedAt: new Date().toISOString(),
+          });
+        }
       }
 
       setUploadedFiles((prev) => [...prev, ...results]);
 
       if (onFileUpload) {
-        await onFileUpload(fileArray);
+        await onFileUpload(results);
       }
     } catch (error) {
       console.error('Error handling files:', error);

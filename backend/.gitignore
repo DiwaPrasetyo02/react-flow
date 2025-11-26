@@ -11,3 +11,7 @@ dist/
 build/
 .env
 .venv
+fix_pytorch.bat
+fix_pytorch.ps1
+GOOGLE_EMBEDDING_MIGRATION.md
+pytorch_dll_fix.md
