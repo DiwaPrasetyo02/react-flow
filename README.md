@@ -201,12 +201,7 @@ UPLOAD_FOLDER=./uploads
 MAX_FILE_SIZE=50MB
 ALLOWED_EXTENSIONS=pdf,csv,doc,docx,txt,xls,xlsx,jpg,jpeg,png
 
-# Agent Configuration
-OCR_MAX_PAGES=50
-VECTOR_DIMENSION=384
-EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-EXTRACTION_CONFIDENCE_THRESHOLD=0.7
-SUMMARY_MAX_LENGTH=500
+
 ```
 
 ### 4. Setup Frontend (React)
