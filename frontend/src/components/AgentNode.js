@@ -3,7 +3,7 @@ import { Handle, Position } from 'reactflow';
 import './AgentNode.css';
 
 const AgentNode = ({ data }) => {
-  const { label, layer, type, status, onExecute } = data;
+  const { label, layer, type, status, onExecute, onConfigure } = data;
 
   const getStatusColor = () => {
     switch (status) {
@@ -34,13 +34,22 @@ const AgentNode = ({ data }) => {
         <p className="agent-type">{type}</p>
       </div>
 
-      <button
-        className="execute-btn"
-        onClick={() => onExecute && onExecute(type)}
-        disabled={status === 'running'}
-      >
-        {status === 'running' ? 'Running...' : 'Execute'}
-      </button>
+      <div className="agent-node-actions">
+        <button
+          className="config-btn"
+          onClick={() => onConfigure && onConfigure(type, label)}
+          title="Configure agent"
+        >
+          ⚙️
+        </button>
+        <button
+          className="execute-btn"
+          onClick={() => onExecute && onExecute(type)}
+          disabled={status === 'running'}
+        >
+          {status === 'running' ? 'Running...' : 'Execute'}
+        </button>
+      </div>
 
       <Handle type="source" position={Position.Bottom} />
     </div>

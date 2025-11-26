@@ -9,8 +9,11 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
+import Sidebar from '../components/Sidebar';
 import AgentNode from '../components/AgentNode';
 import ResultsPanel from '../components/ResultsPanel';
+import FileUpload from '../components/FileUpload';
+import AgentConfigModal from '../components/AgentConfigModal';
 import { executeAgent } from '../services/api';
 import './Dashboard.css';
 
@@ -28,6 +31,7 @@ const initialNodes = [
       layer: 1,
       type: 'ocr',
       status: 'idle',
+      config: null,
     },
   },
   {
@@ -39,6 +43,7 @@ const initialNodes = [
       layer: 2,
       type: 'vector',
       status: 'idle',
+      config: null,
     },
   },
   {
@@ -50,6 +55,7 @@ const initialNodes = [
       layer: 3,
       type: 'extraction',
       status: 'idle',
+      config: null,
     },
   },
   {
@@ -61,6 +67,7 @@ const initialNodes = [
       layer: 4,
       type: 'summary',
       status: 'idle',
+      config: null,
     },
   },
 ];
@@ -72,10 +79,19 @@ const initialEdges = [
 ];
 
 const Dashboard = () => {
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [results, setResults] = useState([]);
-  const [inputData, setInputData] = useState('');
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+
+  // Configuration modal state
+  const [configModal, setConfigModal] = useState({
+    isOpen: false,
+    agentType: null,
+    agentName: null,
+    currentConfig: null,
+  });
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -99,15 +115,56 @@ const Dashboard = () => {
     );
   }, [setNodes]);
 
+  const updateNodeConfig = useCallback((agentType, config) => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.data.type === agentType) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              config,
+            },
+          };
+        }
+        return node;
+      })
+    );
+  }, [setNodes]);
+
+  const handleFileUpload = async (files) => {
+    console.log('Files uploaded:', files);
+    setUploadedFiles(files);
+    // TODO: Send files to backend API
+  };
+
+  const handleConfigureAgent = useCallback((agentType, agentName) => {
+    const node = nodes.find(n => n.data.type === agentType);
+    setConfigModal({
+      isOpen: true,
+      agentType,
+      agentName,
+      currentConfig: node?.data.config || null,
+    });
+  }, [nodes]);
+
+  const handleSaveConfig = useCallback((config) => {
+    updateNodeConfig(configModal.agentType, config);
+    console.log('Config saved for', configModal.agentType, config);
+  }, [configModal.agentType, updateNodeConfig]);
+
   const handleExecuteAgent = useCallback(async (agentType) => {
     const nodeId = nodes.find(n => n.data.type === agentType)?.id;
+    const node = nodes.find(n => n.data.type === agentType);
     if (!nodeId) return;
 
     updateNodeStatus(nodeId, 'running');
 
     try {
       const response = await executeAgent(agentType, {
-        input: inputData || `Sample input for ${agentType}`,
+        input: uploadedFiles.length > 0 ? uploadedFiles : 'Sample document input',
+        config: node?.data.config || {},
+        parameters: node?.data.config || {},
       });
 
       const result = {
@@ -117,6 +174,7 @@ const Dashboard = () => {
         input: response.input,
         output: response.output,
         timestamp: new Date().toISOString(),
+        config: node?.data.config,
       };
 
       setResults((prev) => [result, ...prev]);
@@ -141,55 +199,174 @@ const Dashboard = () => {
         updateNodeStatus(nodeId, 'idle');
       }, 3000);
     }
-  }, [inputData, nodes, updateNodeStatus]);
+  }, [uploadedFiles, nodes, updateNodeStatus]);
 
-  const nodesWithExecute = useMemo(() => {
+  const nodesWithCallbacks = useMemo(() => {
     return nodes.map((node) => ({
       ...node,
       data: {
         ...node.data,
         onExecute: handleExecuteAgent,
+        onConfigure: handleConfigureAgent,
       },
     }));
-  }, [nodes, handleExecuteAgent]);
+  }, [nodes, handleExecuteAgent, handleConfigureAgent]);
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return (
+          <div className="dashboard-overview">
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-icon">📊</div>
+                <div className="stat-content">
+                  <h3>Total Processed</h3>
+                  <p className="stat-value">{results.length}</p>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon">📄</div>
+                <div className="stat-content">
+                  <h3>Documents</h3>
+                  <p className="stat-value">{uploadedFiles.length}</p>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon">✅</div>
+                <div className="stat-content">
+                  <h3>Successful</h3>
+                  <p className="stat-value">
+                    {results.filter(r => r.status === 'completed').length}
+                  </p>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon">❌</div>
+                <div className="stat-content">
+                  <h3>Failed</h3>
+                  <p className="stat-value">
+                    {results.filter(r => r.status === 'error').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="recent-activity">
+              <h2>Recent Activity</h2>
+              {results.length === 0 ? (
+                <p className="no-activity">No recent activity</p>
+              ) : (
+                results.slice(0, 5).map((result, index) => (
+                  <div key={index} className="activity-item">
+                    <span className={`activity-status ${result.status}`}>
+                      {result.status === 'completed' ? '✓' : '✗'}
+                    </span>
+                    <div className="activity-details">
+                      <p className="activity-name">{result.agentName}</p>
+                      <p className="activity-time">
+                        {new Date(result.timestamp).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        );
+
+      case 'workflow':
+        return (
+          <>
+            <div className="workflow-header">
+              <h2>Agent Workflow</h2>
+              <p>Configure and execute your multi-agent pipeline</p>
+            </div>
+            <div className="flow-container">
+              <ReactFlow
+                nodes={nodesWithCallbacks}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                nodeTypes={nodeTypes}
+                fitView
+              >
+                <Background />
+                <Controls />
+                <MiniMap />
+              </ReactFlow>
+            </div>
+          </>
+        );
+
+      case 'documents':
+        return (
+          <div className="documents-page">
+            <h2>Document Upload</h2>
+            <p className="page-description">
+              Upload your documents to be processed by the agent pipeline
+            </p>
+            <FileUpload onFileUpload={handleFileUpload} />
+          </div>
+        );
+
+      case 'results':
+        return (
+          <div className="results-page">
+            <h2>Processing Results</h2>
+            <p className="page-description">
+              View detailed results from agent executions
+            </p>
+            <ResultsPanel results={results} />
+          </div>
+        );
+
+      case 'settings':
+        return (
+          <div className="settings-page">
+            <h2>Settings</h2>
+            <div className="settings-section">
+              <h3>API Configuration</h3>
+              <div className="setting-item">
+                <label>Mistral API Key</label>
+                <input type="password" placeholder="Enter Mistral API key" />
+              </div>
+              <div className="setting-item">
+                <label>Gemini API Key</label>
+                <input type="password" placeholder="Enter Gemini API key" />
+              </div>
+              <div className="setting-item">
+                <label>Database Connection</label>
+                <input type="text" placeholder="PostgreSQL connection string" />
+              </div>
+            </div>
+            <button className="save-settings-btn">Save Settings</button>
+          </div>
+        );
+
+      default:
+        return <div>Select a menu item</div>;
+    }
+  };
 
   return (
-    <div className="dashboard">
-      <header className="dashboard-header">
-        <h1>Multi-Agent Dashboard</h1>
-        <p>4-Layer Agent System with React Flow</p>
-      </header>
+    <div className="app-container">
+      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <div className="dashboard-content">
-        <div className="input-section">
-          <label htmlFor="input-data">Input Data:</label>
-          <textarea
-            id="input-data"
-            placeholder="Enter input data for agents..."
-            value={inputData}
-            onChange={(e) => setInputData(e.target.value)}
-            rows={3}
-          />
+      <main className="main-content">
+        <div className="content-wrapper">
+          {renderContent()}
         </div>
+      </main>
 
-        <div className="flow-container">
-          <ReactFlow
-            nodes={nodesWithExecute}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            nodeTypes={nodeTypes}
-            fitView
-          >
-            <Background />
-            <Controls />
-            <MiniMap />
-          </ReactFlow>
-        </div>
-
-        <ResultsPanel results={results} />
-      </div>
+      <AgentConfigModal
+        isOpen={configModal.isOpen}
+        onClose={() => setConfigModal({ ...configModal, isOpen: false })}
+        agentType={configModal.agentType}
+        agentName={configModal.agentName}
+        currentConfig={configModal.currentConfig}
+        onSave={handleSaveConfig}
+      />
     </div>
   );
 };

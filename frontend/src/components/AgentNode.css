@@ -63,8 +63,33 @@
   letter-spacing: 0.5px;
 }
 
+.agent-node-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.config-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 6px;
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.config-btn:hover {
+  background: #e2e8f0;
+  transform: scale(1.05);
+}
+
 .execute-btn {
-  width: 100%;
+  flex: 1;
   padding: 8px 16px;
   background: #3b82f6;
   color: white;
